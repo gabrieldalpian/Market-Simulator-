@@ -31,20 +31,20 @@ export default function Navigation() {
       {/* Main nav */}
       <nav className="bg-white border-b border-gray-200 shadow-sm">
         <div className="w-full px-6">
-          <div className="flex items-center justify-between h-16">
-            <Link href="/" className="font-bold text-xl text-blue-600 hover:text-blue-700 transition-colors tracking-tight flex items-center gap-2">
+          <div className="flex items-center justify-center h-16 gap-12">
+            <Link href="/" className="absolute left-6 font-bold text-xl text-black tracking-tight flex items-center gap-2">
               <span className="text-2xl">📊</span>
-              Synthetic Market Engine
+              Market Simulator
             </Link>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-8">
               {navItems.map((item) => (
                 <Link
                   key={item.path}
                   href={item.path}
-                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                  className={`text-sm font-semibold transition-all pb-0.5 border-b-2 ${
                     isActive(item.path)
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                      ? 'text-blue-600 border-blue-600'
+                      : 'text-gray-600 border-transparent hover:text-gray-900 hover:border-blue-400'
                   }`}
                 >
                   {item.label}
@@ -55,8 +55,8 @@ export default function Navigation() {
         </div>
       </nav>
 
-      {/* LiveTicker bar - dark themed, animated scroll */}
-      <div className="bg-gray-900 border-b border-gray-800 overflow-hidden" style={{ height: '48px' }}>
+      {/* LiveTicker bar - subtle, light background for blending with white theme */}
+      <div className="w-full h-12 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100 shadow-xs flex items-center px-6 overflow-hidden">
         <div className="flex items-center h-full ticker-scroll" style={{ width: 'max-content' }}>
           {tickerStocks.map((stock, idx) => {
             const pos = stock.changePercent >= 0;
@@ -64,11 +64,11 @@ export default function Navigation() {
               <Link
                 key={`${stock.ticker}-${idx}`}
                 href={`/stock/${stock.ticker}`}
-                className="flex items-center gap-3 flex-shrink-0 hover:bg-gray-800 px-5 h-full transition-colors"
+                className="flex items-center gap-3 flex-shrink-0 hover:bg-gray-100 px-5 h-full transition-colors rounded"
               >
-                <span className="text-sm font-mono font-bold text-white">{stock.ticker}</span>
-                <span className="text-sm font-mono text-gray-300">${stock.price.toFixed(2)}</span>
-                <span className={`text-sm font-mono font-bold ${pos ? 'text-green-400' : 'text-red-400'}`}>
+                <span className="text-sm font-mono font-bold text-gray-700">{stock.ticker}</span>
+                <span className="text-sm font-mono text-gray-500">${stock.price.toFixed(2)}</span>
+                <span className={`text-sm font-mono font-bold ${pos ? 'text-green-600' : 'text-red-600'}`}>
                   {pos ? '▲' : '▼'} {pos ? '+' : ''}{stock.changePercent.toFixed(2)}%
                 </span>
               </Link>
