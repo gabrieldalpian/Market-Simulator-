@@ -64,7 +64,8 @@ export default function StockChart({ ticker }: StockChartProps) {
   const prices = history.map((p) => p.price);
   const minPrice = Math.min(...prices);
   const maxPrice = Math.max(...prices);
-  const padding = (maxPrice - minPrice) * 0.1 || maxPrice * 0.01;
+  const range = maxPrice - minPrice;
+  const padding = (range * 0.15) || (maxPrice * 0.02); // Increased padding for better vertical display
 
   const isPositive =
     history.length >= 2 &&
@@ -104,10 +105,10 @@ export default function StockChart({ ticker }: StockChartProps) {
             />
             <Tooltip content={<CustomTooltip />} />
             <Area
-              type="monotone"
+              type="natural"
               dataKey="price"
               stroke={lineColor}
-              strokeWidth={2.5}
+              strokeWidth={3}
               fill={`url(#stockGrad-${ticker})`}
               dot={false}
               isAnimationActive={false}

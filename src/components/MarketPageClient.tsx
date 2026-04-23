@@ -90,13 +90,13 @@ export default function MarketPageClient() {
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
               <XAxis dataKey="timestamp" tickFormatter={formatTime} stroke="#cbd5e1" tick={{ fontSize: 12 }} minTickGap={60} axisLine={false} />
-              <YAxis stroke="#cbd5e1" tick={{ fontSize: 12 }} width={55} tickFormatter={(v: number) => v.toFixed(1)} axisLine={false} />
+              <YAxis stroke="#cbd5e1" tick={{ fontSize: 12 }} width={55} tickFormatter={(v: number) => v.toFixed(1)} domain={['dataMin - 0.15 * (dataMax - dataMin)', 'dataMax + 0.15 * (dataMax - dataMin)']} axisLine={false} />
               <Tooltip
                 contentStyle={{ fontSize: 14, border: '1px solid #e5e7eb', borderRadius: 8, padding: '10px 14px' }}
                 labelFormatter={(v: number) => formatTime(v)}
                 formatter={(v: number) => [v.toFixed(2), 'Index']}
               />
-              <Area type="monotone" dataKey="value" stroke={indexPositive ? '#16a34a' : '#dc2626'} strokeWidth={2.5} fill="url(#mktIdxGrad)" dot={false} isAnimationActive={false} />
+              <Area type="natural" dataKey="value" stroke={indexPositive ? '#16a34a' : '#dc2626'} strokeWidth={3} fill="url(#mktIdxGrad)" dot={false} isAnimationActive={false} />
             </AreaChart>
           </ResponsiveContainer>
         </div>

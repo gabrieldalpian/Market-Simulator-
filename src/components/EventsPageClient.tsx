@@ -1,262 +1,343 @@
 'use client';
 
 import { useMarketStore } from '@/lib/store';
-import { eventDefinitions } from '@/lib/events';
+import { formatDate, getEventImpactText } from '@/lib/calculations';
+import Link from 'next/link';
+import { useState, useMemo } from 'react';
 
-const sectorIcons: Record<string, string> = {
-  Technology: '💻', Energy: '⚡', Healthcare: '🧬', Entertainment: '🎬',
-  Aerospace: '🚀', Finance: '💰', Materials: '⛏️', Consumer: '🛍️',
-  Industrial: '🏭', Telecom: '📡', Global: '🌐',
-};
+type SentimentFilter = 'all' | 'bullish' | 'bearish' | 'neutral';
 
-const sectorHeaderColors: Record<string, string> = {
-  Technology: 'from-blue-500 to-blue-600',
-  Energy: 'from-amber-500 to-amber-600',
-  Healthcare: 'from-emerald-500 to-emerald-600',
-  Entertainment: 'from-purple-500 to-purple-600',
-  Aerospace: 'from-sky-500 to-sky-600',
-  Finance: 'from-indigo-500 to-indigo-600',
-  Materials: 'from-orange-500 to-orange-600',
-  Consumer: 'from-pink-500 to-pink-600',
-  Industrial: 'from-slate-500 to-slate-600',
-  Telecom: 'from-cyan-500 to-cyan-600',
-  Global: 'from-gray-500 to-gray-600',
-};
-
-const sectorImageGradients: Record<string, string> = {
-  Technology: 'from-blue-400 via-indigo-500 to-purple-600',
-  Energy: 'from-amber-400 via-orange-500 to-red-500',
-  Healthcare: 'from-emerald-400 via-teal-500 to-cyan-600',
-  Entertainment: 'from-purple-400 via-fuchsia-500 to-pink-500',
-  Aerospace: 'from-sky-400 via-blue-500 to-indigo-600',
-  Finance: 'from-indigo-400 via-blue-500 to-cyan-500',
-  Materials: 'from-orange-400 via-amber-500 to-yellow-500',
-  Consumer: 'from-pink-400 via-rose-500 to-red-500',
-  Industrial: 'from-slate-400 via-gray-500 to-zinc-600',
-  Telecom: 'from-cyan-400 via-teal-500 to-emerald-500',
-  Global: 'from-gray-400 via-slate-500 to-gray-600',
-};
-
-interface NewsItem {
-  id: string;
-  title: string;
-  description: string;
-  sector: string;
-  impact: number;
-  timeLabel: string;
-  isLive: boolean;
+interface EventWithMetrics {
+  event: any;
+  totalImpact: number;
+  isPositive: boolean;
+  severity: 'high' | 'medium' | 'low';
+  affectedSectors: number;
 }
-
-const staticNews: NewsItem[] = [
-  { id: 'sn-1', title: 'AI Infrastructure Spending Hits Record High', description: 'Global AI infrastructure investments reach $150B as companies race to build computing capacity for next-gen models. NexaAI and Pulsar Robotics expected to benefit significantly from the surge in demand for AI chips and compute.', sector: 'Technology', impact: 3.2, timeLabel: '2h ago', isLive: false },
-  { id: 'sn-2', title: 'Renewable Energy Tax Credits Extended Through 2030', description: 'Congress passes sweeping legislation extending clean energy tax credits, boosting solar, wind, and hydrogen sector investments across the board. SolarVault and HydroGen Systems rally.', sector: 'Energy', impact: 4.5, timeLabel: '3h ago', isLive: false },
-  { id: 'sn-3', title: 'Gene Therapy Breakthrough Announced by Syntherix', description: 'Syntherix Biotech announces successful Phase 3 trials for its novel CRISPR-based treatment targeting rare genetic diseases, beating analyst expectations with 94% efficacy rate.', sector: 'Healthcare', impact: 5.1, timeLabel: '4h ago', isLive: false },
-  { id: 'sn-4', title: 'Space Tourism Revenue Projections Raised to $8B', description: 'Analysts upgrade orbital tourism market size estimates to $8B by 2028 after strong commercial flight bookings from OrbitX Aerospace and StarAxis Corp.', sector: 'Aerospace', impact: 2.8, timeLabel: '5h ago', isLive: false },
-  { id: 'sn-5', title: 'VR Streaming Platform Debuts to 10M Subscribers', description: 'VirtuWorld Media launches immersive virtual reality streaming service with record first-week adoption, disrupting traditional entertainment. StreamWave expected to follow suit.', sector: 'Entertainment', impact: 6.2, timeLabel: '6h ago', isLive: false },
-  { id: 'sn-6', title: 'Federal Reserve Signals Rate Stability Through Q3', description: 'Central bank indicates rates will hold steady through Q3, providing predictability for financial sector operations. Vaultex Capital and Cradle Finance see positive outlook.', sector: 'Finance', impact: 1.5, timeLabel: '7h ago', isLive: false },
-  { id: 'sn-7', title: 'Rare Earth Discovery in Northern Canada', description: 'TerraNova Mining announces discovery of significant rare earth mineral deposits valued at $12B, shares surge in premarket trading on supply chain implications for tech manufacturing.', sector: 'Materials', impact: 8.3, timeLabel: '8h ago', isLive: false },
-  { id: 'sn-8', title: 'Luxury Brands Report Record Q3 Earnings', description: 'NobleBrand Luxury and other premium consumer companies report strongest quarterly earnings in five years, driven by emerging market demand and digital commerce expansion.', sector: 'Consumer', impact: 4.7, timeLabel: '9h ago', isLive: false },
-  { id: 'sn-9', title: 'AutoMate Systems Wins Pentagon Automation Contract', description: 'AutoMate Systems secures $3.2B Pentagon contract for next-generation manufacturing automation, beating three rival bidders. DroneForge Inc also awarded subcontractor role.', sector: 'Industrial', impact: 5.4, timeLabel: '10h ago', isLive: false },
-  { id: 'sn-10', title: '5G Satellite Network Reaches 40-Country Milestone', description: 'WaveLink Networks and Signal Dynamics announce their joint low-orbit 5G satellite network has achieved coverage in 40 countries, unlocking rural enterprise contracts worth $2B annually.', sector: 'Telecom', impact: 3.1, timeLabel: '11h ago', isLive: false },
-  { id: 'sn-11', title: 'Quantum Computing Logistics Milestone Achieved', description: 'Pulsar Robotics demonstrates quantum advantage in real-world supply chain optimization, marking an industry first for practical quantum applications in warehousing and distribution.', sector: 'Technology', impact: 4.7, timeLabel: '12h ago', isLive: false },
-  { id: 'sn-12', title: 'GrapheneX Reveals Battery Breakthrough', description: 'GrapheneX Ltd unveils graphene-based solid-state battery with 3x energy density and 10-minute charging. Partnership with major EV manufacturers expected within weeks.', sector: 'Materials', impact: 7.2, timeLabel: '13h ago', isLive: false },
-  { id: 'sn-13', title: 'FinexAI Trading Platform Surpasses $1T Daily Volume', description: 'FinexAI Trading reports its algorithmic platform now handles over $1 trillion in daily transactions, making it the largest AI-driven exchange infrastructure globally.', sector: 'Finance', impact: 3.8, timeLabel: '14h ago', isLive: false },
-  { id: 'sn-14', title: 'Metaverse Studios Acquires Major Gaming Publisher', description: 'Metaverse Studios announces $4.5B acquisition of leading gaming publisher, consolidating its position in the immersive entertainment space. Integration expected by Q2.', sector: 'Entertainment', impact: 5.5, timeLabel: '15h ago', isLive: false },
-  { id: 'sn-15', title: 'Lunar Industries Secures Moon Base Construction Contract', description: 'Lunar Industries awarded primary contractor role for international moon base construction project, the largest space infrastructure project in history at $18B over 8 years.', sector: 'Aerospace', impact: 9.1, timeLabel: '16h ago', isLive: false },
-];
 
 export default function EventsPageClient() {
   const eventLog = useMarketStore((s) => s.eventLog);
-  const triggerEvent = useMarketStore((s) => s.triggerEvent);
+  const stocks = useMarketStore((s) => s.stocks);
+  const [sentimentFilter, setSentimentFilter] = useState<SentimentFilter>('all');
+  const [sectorFilter, setSectorFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'time' | 'impact'>('time');
 
-  // Mix live events with static news
-  const liveNews: NewsItem[] = eventLog.map((e) => {
-    const sectors = Object.entries(e.impacts);
-    const primarySector = sectors.length > 0 ? sectors[0][0] : 'Global';
-    const totalImpact = sectors.reduce((sum, [, v]) => sum + v, 0) * 100;
-    return {
-      id: e.id,
-      title: e.name,
-      description: e.description,
-      sector: primarySector,
-      impact: totalImpact,
-      timeLabel: new Date(e.timestamp).toLocaleTimeString(),
-      isLive: true,
-    };
-  });
+  // Get unique sectors from events
+  const sectors = useMemo(() => {
+    const sectorSet = new Set<string>();
+    eventLog.forEach((e) => {
+      Object.keys(e.impacts).forEach((s) => sectorSet.add(s));
+    });
+    return Array.from(sectorSet).sort();
+  }, [eventLog]);
 
-  const allNews = [...liveNews, ...staticNews];
+  // Process events with metrics
+  const processedEvents = useMemo(() => {
+    return eventLog.map((event) => {
+      const totalImpact = Object.values(event.impacts).reduce((a, b) => a + b, 0);
+      const affectedSectors = Object.keys(event.impacts).length;
+      const severity =
+        Math.abs(totalImpact) > 0.15 ? 'high' : Math.abs(totalImpact) > 0.08 ? 'medium' : 'low';
+
+      return {
+        event,
+        totalImpact,
+        isPositive: totalImpact > 0,
+        severity,
+        affectedSectors,
+      } as EventWithMetrics;
+    });
+  }, [eventLog]);
+
+  // Filter events by sentiment and sector
+  const filteredEvents = useMemo(() => {
+    let filtered = processedEvents.filter((item) => {
+      // Sentiment filter
+      if (sentimentFilter === 'bullish' && item.totalImpact <= 0) return false;
+      if (sentimentFilter === 'bearish' && item.totalImpact >= 0) return false;
+      if (sentimentFilter === 'neutral' && item.totalImpact !== 0) return false;
+
+      // Sector filter
+      if (sectorFilter !== 'all' && !item.event.impacts[sectorFilter]) return false;
+
+      return true;
+    });
+
+    // Sort
+    if (sortBy === 'impact') {
+      filtered = filtered.sort((a, b) => Math.abs(b.totalImpact) - Math.abs(a.totalImpact));
+    }
+
+    return filtered;
+  }, [processedEvents, sentimentFilter, sectorFilter, sortBy]);
+
+  // Statistics
+  const stats = useMemo(() => {
+    const bullishCount = processedEvents.filter((e) => e.totalImpact > 0).length;
+    const bearishCount = processedEvents.filter((e) => e.totalImpact < 0).length;
+    const neutralCount = processedEvents.filter((e) => e.totalImpact === 0).length;
+    const highImpactCount = processedEvents.filter((e) => e.severity === 'high').length;
+
+    return { bullishCount, bearishCount, neutralCount, highImpactCount, totalEvents: eventLog.length };
+  }, [processedEvents, eventLog]);
+
+  // Get top affected stocks for each event
+  const getTopMoversForEvent = (impacts: Record<string, number>) => {
+    const stocksByImpact: Array<[string, number]> = [];
+    stocks.forEach((stock) => {
+      const sectorImpact = impacts[stock.sector] || 0;
+      if (sectorImpact !== 0) {
+        stocksByImpact.push([stock.ticker, sectorImpact]);
+      }
+    });
+    return stocksByImpact
+      .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
+      .slice(0, 3);
+  };
+
+  const getSeverityColor = (severity: string, isPositive: boolean) => {
+    if (isPositive) {
+      return severity === 'high' ? 'bg-green-50 border-green-200' :
+             severity === 'medium' ? 'bg-emerald-50 border-emerald-200' :
+             'bg-teal-50 border-teal-200';
+    } else {
+      return severity === 'high' ? 'bg-red-50 border-red-200' :
+             severity === 'medium' ? 'bg-orange-50 border-orange-200' :
+             'bg-amber-50 border-amber-200';
+    }
+  };
+
+  const getSeverityBadgeColor = (severity: string, isPositive: boolean) => {
+    if (isPositive) {
+      return severity === 'high' ? 'bg-green-100 text-green-700' :
+             severity === 'medium' ? 'bg-emerald-100 text-emerald-700' :
+             'bg-teal-100 text-teal-700';
+    } else {
+      return severity === 'high' ? 'bg-red-100 text-red-700' :
+             severity === 'medium' ? 'bg-orange-100 text-orange-700' :
+             'bg-amber-100 text-amber-700';
+    }
+  };
 
   return (
-    <div className="w-full px-6 py-6">
-      <div className="flex items-center justify-between mb-5">
-        <h1 className="text-3xl font-bold text-gray-900">Market Events &amp; News</h1>
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-400 font-mono">{allNews.length} stories</span>
+    <div className="w-full px-6 py-8">
+      {/* Header */}
+      <div className="mb-10">
+        <h1 className="text-4xl font-bold text-gray-900 mb-3">Market Events</h1>
+        <p className="text-gray-500 text-lg">Track market-moving events and their impact across sectors</p>
+      </div>
+
+      {/* KPI Cards - Enhanced */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-10">
+        <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm hover:shadow-md transition-shadow">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Total Events</p>
+          <div className="text-3xl font-bold text-gray-900">{stats.totalEvents}</div>
+          <p className="text-xs text-gray-400 mt-2">All recorded events</p>
+        </div>
+        <div className="bg-green-50 border border-green-200 rounded-lg p-5 shadow-sm hover:shadow-md transition-shadow">
+          <p className="text-xs font-semibold text-green-700 uppercase tracking-wider mb-3">Bullish</p>
+          <div className="text-3xl font-bold text-green-600">{stats.bullishCount}</div>
+          <p className="text-xs text-green-600 mt-2">Positive events</p>
+        </div>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-5 shadow-sm hover:shadow-md transition-shadow">
+          <p className="text-xs font-semibold text-red-700 uppercase tracking-wider mb-3">Bearish</p>
+          <div className="text-3xl font-bold text-red-600">{stats.bearishCount}</div>
+          <p className="text-xs text-red-600 mt-2">Negative events</p>
+        </div>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-5 shadow-sm hover:shadow-md transition-shadow">
+          <p className="text-xs font-semibold text-blue-700 uppercase tracking-wider mb-3">Neutral</p>
+          <div className="text-3xl font-bold text-blue-600">{stats.neutralCount}</div>
+          <p className="text-xs text-blue-600 mt-2">Balanced impact</p>
+        </div>
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-5 shadow-sm hover:shadow-md transition-shadow">
+          <p className="text-xs font-semibold text-purple-700 uppercase tracking-wider mb-3">High Impact</p>
+          <div className="text-3xl font-bold text-purple-600">{stats.highImpactCount}</div>
+          <p className="text-xs text-purple-600 mt-2">Major events</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
-        {/* News Feed */}
-        <div className="xl:col-span-3 space-y-4">
-          {allNews.map((item) => {
-            const icon = sectorIcons[item.sector] || '📊';
-            const gradient = sectorHeaderColors[item.sector] || sectorHeaderColors['Global'];
-            const imageGradient = sectorImageGradients[item.sector] || sectorImageGradients['Global'];
-            const impactPositive = item.impact >= 0;
+      {/* Filters and Sort */}
+      <div className="mb-10">
+        <h2 className="text-sm font-bold text-gray-600 uppercase tracking-wider mb-5">Filters</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Sentiment Filter */}
+          <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
+            <p className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-4">Sentiment</p>
+            <div className="space-y-2">
+              {(['all', 'bullish', 'bearish', 'neutral'] as const).map((filter) => (
+                <button
+                  key={filter}
+                  onClick={() => setSentimentFilter(filter)}
+                  className={`w-full text-left px-4 py-3 rounded-lg text-sm font-semibold transition-all ${
+                    sentimentFilter === filter
+                      ? filter === 'all'
+                        ? 'bg-gray-900 text-white shadow-sm'
+                        : filter === 'bullish'
+                          ? 'bg-green-600 text-white shadow-sm'
+                          : filter === 'bearish'
+                            ? 'bg-red-600 text-white shadow-sm'
+                            : 'bg-blue-600 text-white shadow-sm'
+                      : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200'
+                  }`}
+                >
+                  {filter === 'all' && '📊 All Events'}
+                  {filter === 'bullish' && '📈 Bullish Only'}
+                  {filter === 'bearish' && '📉 Bearish Only'}
+                  {filter === 'neutral' && '➖ Neutral Only'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Sector Filter */}
+          <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
+            <p className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-4">Sector</p>
+            <select
+              value={sectorFilter}
+              onChange={(e) => setSectorFilter(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white transition-all hover:border-gray-300"
+            >
+              <option value="all">All Sectors</option>
+              {sectors.map((sector) => (
+                <option key={sector} value={sector}>
+                  {sector}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Sort */}
+          <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
+            <p className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-4">Sort By</p>
+            <div className="space-y-2">
+              {[
+                { value: 'time', label: '⏰ Most Recent' },
+                { value: 'impact', label: '💥 Highest Impact' },
+              ].map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => setSortBy(option.value as 'time' | 'impact')}
+                  className={`w-full text-left px-4 py-3 rounded-lg text-sm font-semibold transition-all ${
+                    sortBy === option.value
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Events Timeline */}
+      <div className="space-y-5">
+        {filteredEvents.length === 0 ? (
+          <div className="bg-white border border-gray-200 rounded-lg p-16 text-center shadow-sm">
+            <div className="text-4xl mb-4">📭</div>
+            <p className="text-gray-600 text-lg font-semibold">No events match your filters</p>
+            <p className="text-gray-400 text-sm mt-3">Try adjusting your filter selection</p>
+          </div>
+        ) : (
+          filteredEvents.map((item, idx) => {
+            const { event, totalImpact, isPositive, severity, affectedSectors } = item;
+            const topMovers = getTopMoversForEvent(event.impacts);
+            const impactPercent = totalImpact * 100;
+
             return (
-              <div key={item.id} className={`bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm ${item.isLive ? 'slide-in ring-2 ring-blue-200' : ''}`}>
-                <div className="flex">
-                  {/* Colored sidebar */}
-                  <div className={`w-1.5 bg-gradient-to-b ${gradient} flex-shrink-0`} />
-
-                  {/* Image */}
-                  <div className="w-48 h-auto flex-shrink-0 relative overflow-hidden">
-                    <img
-                      src={`https://picsum.photos/seed/${item.id}/192/140`}
-                      alt={item.title}
-                      className="w-full h-full object-cover"
-                      loading="lazy"
-                    />
-                    <div className={`absolute inset-0 bg-gradient-to-br ${imageGradient} opacity-30`} />
-                    <span className="absolute bottom-2 left-2 text-2xl drop-shadow-lg">{icon}</span>
-                  </div>
-
-                  <div className="flex-1 p-5">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-xs px-2 py-1 rounded-md bg-gray-100 text-gray-600 uppercase tracking-wider font-semibold">{item.sector}</span>
-                          {item.isLive && (
-                            <span className="text-xs px-2 py-1 rounded-md bg-blue-100 text-blue-700 font-bold uppercase">Live</span>
-                          )}
-                          <span className="text-xs text-gray-400 ml-auto flex-shrink-0">{item.timeLabel}</span>
-                        </div>
-                        <h3 className="text-lg font-bold text-gray-900 mb-2">{item.title}</h3>
-                        <p className="text-sm text-gray-500 leading-relaxed">{item.description}</p>
-                      </div>
-                      <div className={`flex-shrink-0 px-3 py-2 rounded-lg text-base font-mono font-bold ${impactPositive ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-                        {impactPositive ? '+' : ''}{item.impact.toFixed(1)}%
-                      </div>
+              <div
+                key={event.id}
+                className={`border-l-4 rounded-lg p-6 transition-all shadow-sm hover:shadow-md bg-white ${getSeverityColor(severity, isPositive)}`}
+                style={{
+                  borderLeftColor: isPositive
+                    ? severity === 'high'
+                      ? '#16a34a'
+                      : severity === 'medium'
+                        ? '#059669'
+                        : '#0d9488'
+                    : severity === 'high'
+                      ? '#dc2626'
+                      : severity === 'medium'
+                        ? '#ea580c'
+                        : '#d97706',
+                }}
+              >
+                {/* Event Header */}
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h3 className="text-lg font-bold text-gray-900">{event.name}</h3>
+                      <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${getSeverityBadgeColor(severity, isPositive)}`}>
+                        {severity === 'high' ? '⚡ High Impact' : severity === 'medium' ? '⚠️ Medium' : '📌 Low'}
+                      </span>
                     </div>
-                    {/* Show sector breakdown for live events */}
-                    {item.isLive && (() => {
-                      const event = eventLog.find((e) => e.id === item.id);
-                      if (!event) return null;
-                      return (
-                        <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-gray-100">
-                          {Object.entries(event.impacts).map(([sector, impact]) => (
-                            <span key={sector} className={`text-xs px-2 py-1 rounded-md font-mono font-semibold ${impact >= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-                              {sector} {impact >= 0 ? '+' : ''}{(impact * 100).toFixed(0)}%
-                            </span>
-                          ))}
-                        </div>
-                      );
-                    })()}
+                    <p className="text-sm text-gray-600 leading-relaxed mb-3">{event.description}</p>
+                  </div>
+                  <div className="flex-shrink-0 ml-6 text-right">
+                    <div
+                      className={`text-3xl font-bold font-mono ${isPositive ? 'text-green-600' : 'text-red-600'}`}
+                    >
+                      {isPositive ? '+' : ''}{impactPercent.toFixed(1)}%
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">{affectedSectors} sectors affected</p>
                   </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
 
-        {/* Sidebar */}
-        <div className="space-y-4">
-          {/* Trigger Events */}
-          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
-            <div className="px-5 py-3 border-b border-gray-200 bg-gray-50">
-              <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wider">Trigger Event</h3>
-            </div>
-            <div className="p-3 space-y-2">
-              {eventDefinitions.map((eventDef) => {
-                const totalImpact = Object.values(eventDef.impacts).reduce((a, b) => a + b, 0);
-                const isPositive = totalImpact > 0;
-                return (
-                  <button
-                    key={eventDef.id}
-                    onClick={() => triggerEvent(eventDef)}
-                    className="w-full text-left px-4 py-3 rounded-lg border transition-all hover:scale-[1.01] active:scale-[0.99]"
-                    style={{
-                      borderColor: eventDef.color + '40',
-                      backgroundColor: eventDef.color + '08',
-                    }}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-sm" style={{ color: eventDef.color }}>{eventDef.name}</span>
-                      <span className={`text-xs font-mono font-bold ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
-                        {isPositive ? '+' : ''}{(totalImpact * 100).toFixed(0)}%
-                      </span>
-                    </div>
-                    <div className="text-xs text-gray-500 mt-1">{eventDef.description}</div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+                {/* Timestamp */}
+                <p className="text-xs text-gray-500 mb-5 flex items-center gap-2 pb-4 border-b border-gray-100">
+                  🕐 {formatDate(event.timestamp)}
+                </p>
 
-          {/* Sector Impact Summary */}
-          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
-            <div className="px-5 py-3 border-b border-gray-200 bg-gray-50">
-              <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wider">Sector Impact Map</h3>
-            </div>
-            <div className="p-3">
-              {Object.keys(sectorIcons).filter((s) => s !== 'Global').map((sector) => {
-                const eventsForSector = eventLog.filter((e) => e.impacts[sector] !== undefined);
-                const totalImpact = eventsForSector.reduce((sum, e) => sum + (e.impacts[sector] || 0), 0);
-                return (
-                  <div key={sector} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-base">{sectorIcons[sector]}</span>
-                      <span className="text-sm text-gray-700">{sector}</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="w-20 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                {/* Sector Impacts Grid */}
+                <div className="mb-5">
+                  <p className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-4">Sector Impacts</p>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {Object.entries(event.impacts).map(([sector, impact]) => {
+                      const impactValue = impact as number;
+                      return (
                         <div
-                          className={`h-full rounded-full ${totalImpact >= 0 ? 'bg-green-400' : 'bg-red-400'}`}
-                          style={{ width: `${Math.min(100, Math.abs(totalImpact) * 200)}%` }}
-                        />
-                      </div>
-                      <span className={`text-xs font-mono font-bold w-14 text-right ${totalImpact >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {totalImpact === 0 ? '—' : `${totalImpact >= 0 ? '+' : ''}${(totalImpact * 100).toFixed(1)}%`}
-                      </span>
+                          key={sector}
+                          className={`p-3 rounded-lg border transition-all ${impactValue >= 0 ? 'bg-green-50 border-green-200 hover:border-green-300' : 'bg-red-50 border-red-200 hover:border-red-300'}`}
+                        >
+                          <p className="text-xs font-semibold text-gray-600 mb-2">{sector}</p>
+                          <p className={`font-mono font-bold text-sm ${impactValue >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                            {impactValue >= 0 ? '+' : ''}{(impactValue * 100).toFixed(1)}%
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Top Movers */}
+                {topMovers.length > 0 && (
+                  <div className="pt-4 border-t border-gray-100">
+                    <p className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-4">Top Affected Stocks</p>
+                    <div className="flex flex-wrap gap-2">
+                      {topMovers.map(([ticker, impact]) => {
+                        const stock = stocks.find((s) => s.ticker === ticker);
+                        return (
+                          <Link
+                            key={ticker}
+                            href={`/stock/${ticker}`}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-all hover:scale-105 ${
+                              impact >= 0
+                                ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                : 'bg-red-100 text-red-700 hover:bg-red-200'
+                            }`}
+                          >
+                            {ticker} {impact >= 0 ? '+' : ''}{(impact * 100).toFixed(1)}%
+                          </Link>
+                        );
+                      })}
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Quick Stats */}
-          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
-            <div className="px-5 py-3 border-b border-gray-200 bg-gray-50">
-              <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wider">Event Stats</h3>
-            </div>
-            <div className="p-3 space-y-1">
-              <div className="flex items-center justify-between py-2">
-                <span className="text-sm text-gray-500">Total Events</span>
-                <span className="text-sm font-mono font-bold text-gray-900">{eventLog.length}</span>
+                )}
               </div>
-              <div className="flex items-center justify-between py-2">
-                <span className="text-sm text-gray-500">Positive Events</span>
-                <span className="text-sm font-mono font-bold text-green-600">
-                  {eventLog.filter((e) => Object.values(e.impacts).reduce((a, b) => a + b, 0) > 0).length}
-                </span>
-              </div>
-              <div className="flex items-center justify-between py-2">
-                <span className="text-sm text-gray-500">Negative Events</span>
-                <span className="text-sm font-mono font-bold text-red-600">
-                  {eventLog.filter((e) => Object.values(e.impacts).reduce((a, b) => a + b, 0) < 0).length}
-                </span>
-              </div>
-              <div className="flex items-center justify-between py-2">
-                <span className="text-sm text-gray-500">Sectors Affected</span>
-                <span className="text-sm font-mono font-bold text-gray-900">
-                  {new Set(eventLog.flatMap((e) => Object.keys(e.impacts))).size}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
+            );
+          })
+        )}
       </div>
     </div>
   );
