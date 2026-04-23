@@ -1,6 +1,6 @@
 import { Stock } from './types';
 
-export const initialStocks: Stock[] = [
+const baseStocks = [
   // ═══ Technology ═══
   { ticker: 'NXAI', name: 'NexaAI Corp', sector: 'Technology', price: 342.50, openPrice: 342.50, change: 0, changePercent: 0, momentum: 0.020, volatility: 0.030, high: 342.50, low: 342.50 },
   { ticker: 'PLSR', name: 'Pulsar Robotics', sector: 'Technology', price: 267.15, openPrice: 267.15, change: 0, changePercent: 0, momentum: 0.012, volatility: 0.028, high: 267.15, low: 267.15 },
@@ -55,3 +55,9 @@ export const initialStocks: Stock[] = [
   { ticker: 'WVLN', name: 'WaveLink Networks', sector: 'Telecom', price: 118.45, openPrice: 118.45, change: 0, changePercent: 0, momentum: 0.003, volatility: 0.020, high: 118.45, low: 118.45 },
   { ticker: 'SGNL', name: 'Signal Dynamics', sector: 'Telecom', price: 86.70, openPrice: 86.70, change: 0, changePercent: 0, momentum: -0.006, volatility: 0.028, high: 86.70, low: 86.70 },
 ];
+
+export const initialStocks: Stock[] = baseStocks.map(stock => ({
+  ...stock,
+  weekHighPrice: stock.high,
+  weekLowPrice: stock.low,
+}));
